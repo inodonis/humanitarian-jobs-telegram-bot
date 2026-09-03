@@ -1,31 +1,60 @@
 import os
 import requests
+import xml.etree.ElementTree as ET
 
 TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
 CHANNEL = os.environ["TELEGRAM_CHANNEL_ID"]
 
-url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
+RSS_URL = "https://reliefweb.int/jobs/rss.xml?advanced-search=%28C87%29"
 
-message = """🤖 <b>Ethiopia Jobs Finder</b>
+TELEGRAM_URL = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
 
-The bot is now connected successfully!
 
-RSS job monitoring will be added next.
+# Get the RSS feed
+response = requests.get(RSS_URL, timeout=30)
+response.raise_for_status()
 
-#EthiopiaJobs #HumanitarianJobs
+# Read RSS/XML
+root = ET.fromstring(response.content)
+
+# Find the first job
+item = root.find(".//item")
+
+if item is None:
+    print("No jobs found in the RSS feed.")
+    exit()
+
+title = item.findtext("title", "No title")
+link = item.findtext("link", "")
+description = item.findtext("description", "")
+
+# Create Telegram message
+message = f"""🔔 <b>NEW JOB OPPORTUNITY</b>
+
+💼 <b>{title}</b>
+
+{description}
+
+🔗 <a href="{link}">View Job / Apply</a>
+
+#HumanitarianJobs #Jobs
 """
 
-response = requests.post(
-    url,
+# Send to Telegram
+telegram_response = requests.post(
+    TELEGRAM_URL,
     json={
         "chat_id": CHANNEL,
         "text": message,
-        "parse_mode": "HTML"
+        "parse_mode": "HTML",
+        "disable_web_page_preview": False
     },
     timeout=30
 )
 
-print(response.status_code)
-print(response.text)
+print("Telegram status:", telegram_response.status_code)
+print(telegram_response.text)
 
-response.raise_for_status()
+telegram_response.raise_for_status()
+
+print("✅ Job posted successfully!")
