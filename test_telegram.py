@@ -1,6 +1,8 @@
 import os
 import requests
 import xml.etree.ElementTree as ET
+from html import unescape
+import re
 
 TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
 CHANNEL = os.environ["TELEGRAM_CHANNEL_ID"]
@@ -27,6 +29,16 @@ if item is None:
 title = item.findtext("title", "No title")
 link = item.findtext("link", "")
 description = item.findtext("description", "")
+
+# Remove HTML tags from description
+description = unescape(description)
+description = re.sub(r"<[^>]+>", "", description)
+
+# Clean extra whitespace
+description = re.sub(r"\s+", " ", description).strip()
+
+# Limit description length
+description = description[:1000]
 
 # Create Telegram message
 message = f"""🔔 <b>NEW JOB OPPORTUNITY</b>
