@@ -1,4 +1,4 @@
-name: Test Telegram Bot
+name: Daily Ethiopia Jobs
 
 on:
   schedule:
@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  test:
+  jobs:
     runs-on: ubuntu-latest
 
     steps:
@@ -22,8 +22,14 @@ jobs:
         run: |
           pip install requests
 
-      - name: Test Telegram
+      - name: Fetch ReliefWeb jobs
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHANNEL_ID: ${{ secrets.TELEGRAM_CHANNEL_ID }}
         run: python test_telegram.py
+
+      - name: Fetch Afriwork jobs
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHANNEL_ID: ${{ secrets.TELEGRAM_CHANNEL_ID }}
+        run: python test_afriwork.py
