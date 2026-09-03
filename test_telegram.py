@@ -3,6 +3,7 @@ import requests
 import xml.etree.ElementTree as ET
 from html import unescape
 import re
+import time
 
 TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
 CHANNEL = os.environ["TELEGRAM_CHANNEL_ID"]
@@ -19,29 +20,34 @@ response.raise_for_status()
 # Read RSS/XML
 root = ET.fromstring(response.content)
 
-# Find the first job
-item = root.find(".//item")
+# Get the 10 latest jobs
+items = root.findall(".//item")[:10]
 
-if item is None:
+if not items:
     print("No jobs found in the RSS feed.")
     exit()
 
-title = item.findtext("title", "No title")
-link = item.findtext("link", "")
-description = item.findtext("description", "")
+print(f"Found {len(items)} jobs.")
 
-# Remove HTML tags from description
-description = unescape(description)
-description = re.sub(r"<[^>]+>", "", description)
 
-# Clean extra whitespace
-description = re.sub(r"\s+", " ", description).strip()
+for number, item in enumerate(items, start=1):
 
-# Limit description length
-description = description[:1000]
+    title = item.findtext("title", "No title")
+    link = item.findtext("link", "")
+    description = item.findtext("description", "")
 
-# Create Telegram message
-message = f"""🔔 <b>NEW JOB OPPORTUNITY</b>
+    # Remove HTML from description
+    description = unescape(description)
+    description = re.sub(r"<[^>]+>", "", description)
+
+    # Clean extra whitespace
+    description = re.sub(r"\s+", " ", description).strip()
+
+    # Limit description length
+    description = description[:1000]
+
+    # Create Telegram message
+    message = f"""🔔 <b>NEW JOB OPPORTUNITY</b>
 
 💼 <b>{title}</b>
 
@@ -52,21 +58,24 @@ message = f"""🔔 <b>NEW JOB OPPORTUNITY</b>
 #HumanitarianJobs #Jobs
 """
 
-# Send to Telegram
-telegram_response = requests.post(
-    TELEGRAM_URL,
-    json={
-        "chat_id": CHANNEL,
-        "text": message,
-        "parse_mode": "HTML",
-        "disable_web_page_preview": False
-    },
-    timeout=30
-)
+    # Send to Telegram
+    telegram_response = requests.post(
+        TELEGRAM_URL,
+        json={
+            "chat_id": CHANNEL,
+            "text": message,
+            "parse_mode": "HTML",
+            "disable_web_page_preview": False
+        },
+        timeout=30
+    )
 
-print("Telegram status:", telegram_response.status_code)
-print(telegram_response.text)
+    print(f"Job {number}: Telegram status {telegram_response.status_code}")
+    telegram_response.raise_for_status()
 
-telegram_response.raise_for_status()
+    print(f"✅ Posted: {title}")
 
-print("✅ Job posted successfully!")
+    # Small delay between messages
+    time.sleep(2)
+
+print("🎉 All 10 jobs posted successfully!")
