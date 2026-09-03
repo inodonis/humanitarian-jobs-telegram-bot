@@ -20,11 +20,13 @@ query GetAllJobs($offset: Int!, $whereCondition: jobs_bool_exp!, $orderCondition
     description
     job_type
     job_site
-    deadline
-    compensation_amount_cents
-    compensation_type
-    compensation_currency
-    experience_level
+
+    skill_requirements {
+      skill {
+        name
+        id
+      }
+    }
 
     city {
       name
@@ -36,8 +38,15 @@ query GetAllJobs($offset: Int!, $whereCondition: jobs_bool_exp!, $orderCondition
     sectors {
       sector {
         name
+        id
       }
     }
+
+    deadline
+    compensation_amount_cents
+    compensation_type
+    compensation_currency
+    experience_level
 
     entity {
       type
@@ -63,8 +72,17 @@ variables = {
     }
 }
 
+headers = {
+    "Content-Type": "application/json",
+    "Accept": "application/json",
+    "Origin": "https://afriworket.com",
+    "Referer": "https://afriworket.com/",
+    "x-hasura-role": "anonymous"
+}
+
 response = requests.post(
     API_URL,
+    headers=headers,
     json={
         "operationName": "GetAllJobs",
         "query": query,
@@ -79,7 +97,12 @@ response.raise_for_status()
 
 data = response.json()
 
-print(data)
+print("\nAPI response received.")
+
+if "errors" in data:
+    print("\nAPI returned an error:")
+    print(data["errors"])
+    raise SystemExit(1)
 
 jobs = data["data"]["jobs"]
 
@@ -91,18 +114,27 @@ for number, job in enumerate(jobs, start=1):
     print(f"JOB {number}")
     print("=" * 60)
 
-    print("Title:", job["title"])
-    print("Company:", job["entity"]["name"] if job.get("entity") else "N/A")
+    print("Title:", job.get("title"))
+
+    entity = job.get("entity")
+    print("Company:", entity.get("name") if entity else "N/A")
+
     print("Job type:", job.get("job_type"))
     print("Job site:", job.get("job_site"))
     print("Experience:", job.get("experience_level"))
     print("Deadline:", job.get("deadline"))
 
-    if job.get("city"):
-        print("Location:", job["city"]["name"])
+    city = job.get("city")
 
-        if job["city"].get("country"):
-            print("Country:", job["city"]["country"]["name"])
+    if city:
+        print("Location:", city.get("name"))
+
+        country = city.get("country")
+
+        if country:
+            print("Country:", country.get("name"))
 
     print("Published:", job.get("published_at"))
-    print("ID:", job["id"])
+    print("ID:", job.get("id"))
+
+print("\nSUCCESS: Afriwork API is working.")
