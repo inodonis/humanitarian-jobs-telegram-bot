@@ -1,6 +1,16 @@
+import os
 import requests
+import re
+from html import unescape
+import time
 
 API_URL = "https://api.afriworket.com/v1/graphql"
+
+TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
+CHANNEL = os.environ["TELEGRAM_CHANNEL_ID"]
+
+TELEGRAM_URL = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
+
 
 query = """
 query GetAllJobs($offset: Int!, $whereCondition: jobs_bool_exp!, $orderCondition: [jobs_order_by!]) {
@@ -13,32 +23,16 @@ query GetAllJobs($offset: Int!, $whereCondition: jobs_bool_exp!, $orderCondition
     id
     title
     created_at
-    updated_at
     published_at
     refreshed_at
-    approval_status
     description
     job_type
     job_site
-
-    skill_requirements {
-      skill {
-        name
-        id
-      }
-    }
 
     city {
       name
       country {
         name
-      }
-    }
-
-    sectors {
-      sector {
-        name
-        id
       }
     }
 
@@ -56,6 +50,7 @@ query GetAllJobs($offset: Int!, $whereCondition: jobs_bool_exp!, $orderCondition
 }
 """
 
+
 variables = {
     "offset": 0,
     "orderCondition": {
@@ -72,6 +67,7 @@ variables = {
     }
 }
 
+
 headers = {
     "Content-Type": "application/json",
     "Accept": "application/json",
@@ -80,6 +76,8 @@ headers = {
     "x-hasura-role": "anonymous"
 }
 
+
+# Get jobs from Afriwork
 response = requests.post(
     API_URL,
     headers=headers,
@@ -91,50 +89,112 @@ response = requests.post(
     timeout=30
 )
 
-print("Status:", response.status_code)
-
 response.raise_for_status()
 
 data = response.json()
 
-print("\nAPI response received.")
-
 if "errors" in data:
-    print("\nAPI returned an error:")
+    print("Afriwork API returned an error:")
     print(data["errors"])
     raise SystemExit(1)
 
 jobs = data["data"]["jobs"]
 
-print(f"\nFound {len(jobs)} jobs.\n")
+print(f"Found {len(jobs)} Afriwork jobs.")
+
 
 for number, job in enumerate(jobs, start=1):
 
-    print("=" * 60)
-    print(f"JOB {number}")
-    print("=" * 60)
+    title = job.get("title") or "Untitled Job"
 
-    print("Title:", job.get("title"))
-
+    # Company
     entity = job.get("entity")
-    print("Company:", entity.get("name") if entity else "N/A")
+    company = entity.get("name") if entity else "Not specified"
 
-    print("Job type:", job.get("job_type"))
-    print("Job site:", job.get("job_site"))
-    print("Experience:", job.get("experience_level"))
-    print("Deadline:", job.get("deadline"))
-
+    # Location
     city = job.get("city")
 
     if city:
-        print("Location:", city.get("name"))
+        location = city.get("name") or "Not specified"
 
         country = city.get("country")
 
-        if country:
-            print("Country:", country.get("name"))
+        if country and country.get("name"):
+            location = f"{location}, {country['name']}"
+    else:
+        location = "Not specified"
 
-    print("Published:", job.get("published_at"))
-    print("ID:", job.get("id"))
+    # Description
+    description = job.get("description") or ""
 
-print("\nSUCCESS: Afriwork API is working.")
+    description = unescape(description)
+
+    # Remove HTML
+    description = re.sub(r"<[^>]+>", "", description)
+
+    # Clean whitespace
+    description = re.sub(r"\s+", " ", description).strip()
+
+    # Limit description
+    description = description[:1500]
+
+    # Other information
+    job_type = job.get("job_type") or "Not specified"
+    job_site = job.get("job_site") or "Not specified"
+    experience = job.get("experience_level") or "Not specified"
+    deadline = job.get("deadline") or "Not specified"
+
+    # Afriwork job URL
+    job_id = job.get("id")
+
+    job_url = f"https://afriworket.com/jobs/{job_id}"
+
+
+    # Create Telegram message
+    message = f"""🔔 <b>NEW JOB — AFRIWORK</b>
+
+💼 <b>{title}</b>
+
+🏢 <b>Company:</b> {company}
+📍 <b>Location:</b> {location}
+💼 <b>Job type:</b> {job_type}
+🏢 <b>Work site:</b> {job_site}
+📊 <b>Experience:</b> {experience}
+
+📅 <b>Deadline:</b> {deadline}
+
+📝 <b>Description:</b>
+{description}
+
+🔗 <a href="{job_url}">View Job / Apply</a>
+
+#Afriwork #EthiopiaJobs #Jobs
+"""
+
+
+    # Send to Telegram
+    telegram_response = requests.post(
+        TELEGRAM_URL,
+        json={
+            "chat_id": CHANNEL,
+            "text": message,
+            "parse_mode": "HTML",
+            "disable_web_page_preview": False
+        },
+        timeout=30
+    )
+
+    print(
+        f"Job {number}: Telegram status "
+        f"{telegram_response.status_code}"
+    )
+
+    telegram_response.raise_for_status()
+
+    print(f"✅ Posted: {title}")
+
+    # Wait between messages
+    time.sleep(2)
+
+
+print("\n🎉 All Afriwork jobs posted successfully!")
