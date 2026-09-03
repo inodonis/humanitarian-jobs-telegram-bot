@@ -20,4 +20,7 @@ jobs:
         run: pip install requests
 
       - name: Test Afriwork API
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHANNEL_ID: ${{ secrets.TELEGRAM_CHANNEL_ID }}
         run: python test_afriwork.py
